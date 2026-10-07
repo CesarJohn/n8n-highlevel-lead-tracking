@@ -1,0 +1,848 @@
+{
+  "name": "Automated Customer Inquiry & Lead Tracking System",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Motorcycle Inquiry Form",
+        "formDescription": "Interested in a motorcycle? Submit your details and we’ll contact you.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Motorcycle of interest",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Budget",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Purchase timeline",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Within 7 days"
+                  },
+                  {
+                    "option": "Within 30 days"
+                  },
+                  {
+                    "option": "Just browsing"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8f3671d1-47f2-4d9d-97f1-10f3d12f409c",
+      "name": "On form submission",
+      "webhookId": "b11f46d9-0bf1-4106-a25c-4a0643084080"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json;\n\nconst name = String(data.Name ?? '').trim();\nconst email = String(data.Email ?? '').trim().toLowerCase();\nconst motorcycle = String(data['Motorcycle of interest'] ?? '').trim();\nconst budget = Number(data.Budget);\nconst timeline = String(data['Purchase timeline'] ?? '').trim();\n\nif (!name) throw new Error('Name is required.');\n\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {\n  throw new Error('Enter a valid email address.');\n}\n\nif (!motorcycle) throw new Error('Motorcycle is required.');\n\nif (!Number.isFinite(budget) || budget <= 0) {\n  throw new Error('Budget must be a number greater than zero.');\n}\n\nif (!['Within 7 days', 'Within 30 days', 'Just browsing'].includes(timeline)) {\n  throw new Error('Select a valid purchase timeline.');\n}\n\nreturn {\n  json: {\n    name,\n    email,\n    motorcycle,\n    budget,\n    timeline,\n    message: String(data.Message ?? '').trim(),\n    submittedAt: data.submittedAt\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f5ef4f89-7f96-4b05-8aff-e5b5112ac3b4",
+      "name": "Validate Fields",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "email": "={{ $json.email }}",
+        "additionalFields": {
+          "name": "={{ $json.name }}"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "d9ab172b-c9f5-4ef2-9ec1-1a40828c4b41",
+      "name": "Create or update a contact"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Validate Fields').item.json.timeline }}",
+                    "rightValue": "Within 7 days",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7f2b980a-8458-4957-857e-79979f30e8c8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Hot"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "87f2338f-3948-41b4-a330-4570b88c9776",
+                    "leftValue": "={{ $('Validate Fields').item.json.timeline }}",
+                    "rightValue": "Within 30 days",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Warm"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c916d1c7-1e0d-4ba7-a281-c55989ba3941",
+                    "leftValue": "={{ $('Validate Fields').item.json.timeline }}",
+                    "rightValue": "Just browsing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cold"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -16
+      ],
+      "id": "f3ace94e-142a-409a-a095-7ebf5579aab8",
+      "name": "Classify Lead"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        944,
+        -368
+      ],
+      "id": "d5837140-d558-4c2d-885c-7da9d953352c",
+      "name": "Find Open Opportunity",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Create or update a contact').first().json;\nconst inquiry = $('Validate Fields').first().json;\n\nif (!contact.id) {\n  throw new Error('Missing contact ID.');\n}\n\nconst opportunities = $input.all().flatMap(item =>\n  Array.isArray(item.json.opportunities)\n    ? item.json.opportunities\n    : [item.json]\n);\n\nconst match = opportunities.find(opportunity =>\n  opportunity.id &&\n  (opportunity.contactId ?? opportunity.contact?.id) === contact.id &&\n  opportunity.status === 'open'\n);\n\nreturn [{\n  json: {\n    ...inquiry,\n    contactId: contact.id,\n    opportunityExists: Boolean(match),\n    opportunityId: match?.id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -368
+      ],
+      "id": "fdcdcbf7-4922-4980-b6bf-0a4466111e2a",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "31a0de58-c9b8-48ab-a7ac-88d3d4f02402",
+              "leftValue": "={{ $json.opportunityExists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        -368
+      ],
+      "id": "89dc1bf5-f1bc-4e16-a2e1-209a1ff69ec2",
+      "name": "Opportunity Exists?"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+        "contactId": "={{ $json.contactId }}",
+        "name": "={{ $json.name + ' - ' + $json.motorcycle }}",
+        "additionalFields": {
+          "stageId": "REPLACE_WITH_PRIORITY_FOLLOW_UP_STAGE_ID"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -272
+      ],
+      "id": "498f4dec-a02a-4036-bfb4-628f71d32a6e",
+      "name": "Create an opportunity"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "update",
+        "opportunityId": "={{ $json.opportunityId }}",
+        "updateFields": {
+          "monetaryValue": "={{ $json.budget }}",
+          "stageId": "={{ 'REPLACE_WITH_PRIORITY_FOLLOW_UP_STAGE_ID' }}",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -464
+      ],
+      "id": "b871421e-4578-4c14-b972-db2b8fff95ab",
+      "name": "Update an opportunity"
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "contactId": "={{ $('Create or update a contact').first().json.id }}",
+        "title": "Follow up on motorcycle inquiry",
+        "dueDate": "={{ $now.plus({ days: 1 }).toISO() }}",
+        "additionalFields": {
+          "body": "={{ 'Motorcycle: ' + $('Validate Fields').first().json.motorcycle + '\\nBudget: ₱' + $('Validate Fields').first().json.budget + '\\nMessage: ' + $('Validate Fields').first().json.message }}"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        -336
+      ],
+      "id": "f7549c66-3e56-4ad4-ae39-7535459dc90a",
+      "name": "Create a task"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        928,
+        0
+      ],
+      "id": "34f5ec83-bf97-4c0f-93aa-4f643e8f2f0c",
+      "name": "Find Open Opportunity1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Create or update a contact').first().json;\nconst inquiry = $('Validate Fields').first().json;\n\nif (!contact.id) {\n  throw new Error('Missing contact ID.');\n}\n\nconst opportunities = $input.all().flatMap(item =>\n  Array.isArray(item.json.opportunities)\n    ? item.json.opportunities\n    : [item.json]\n);\n\nconst match = opportunities.find(opportunity =>\n  opportunity.id &&\n  (opportunity.contactId ?? opportunity.contact?.id) === contact.id &&\n  opportunity.status === 'open'\n);\n\nreturn [{\n  json: {\n    ...inquiry,\n    contactId: contact.id,\n    opportunityExists: Boolean(match),\n    opportunityId: match?.id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        0
+      ],
+      "id": "2c9f886f-aa94-4903-87a0-eaf7aae15cde",
+      "name": "Code in JavaScript1",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "31a0de58-c9b8-48ab-a7ac-88d3d4f02402",
+              "leftValue": "={{ $json.opportunityExists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        0
+      ],
+      "id": "53fdd377-00c8-4496-b38a-b138eca33656",
+      "name": "Opportunity Exists?1"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+        "contactId": "={{ $json.contactId }}",
+        "name": "={{ $json.name + ' - ' + $json.motorcycle }}",
+        "additionalFields": {
+          "monetaryValue": "={{ $json.budget }}",
+          "stageId": "REPLACE_WITH_INTERESTED_STAGE_ID"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        96
+      ],
+      "id": "2f5d04b6-7692-45e7-bd65-9b2c5867cd44",
+      "name": "Create an opportunity1"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "update",
+        "opportunityId": "={{ $json.opportunityId }}",
+        "updateFields": {
+          "monetaryValue": "={{ $json.budget }}",
+          "stageId": "={{ 'REPLACE_WITH_INTERESTED_STAGE_ID' }}",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -96
+      ],
+      "id": "4d243a7f-982d-4ac2-9ce6-a6c753f799c4",
+      "name": "Update an opportunity1"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        928,
+        368
+      ],
+      "id": "d0cb3ac6-970a-4b7b-91b4-051482db85ca",
+      "name": "Find Open Opportunity2",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Create or update a contact').first().json;\nconst inquiry = $('Validate Fields').first().json;\n\nif (!contact.id) {\n  throw new Error('Missing contact ID.');\n}\n\nconst opportunities = $input.all().flatMap(item =>\n  Array.isArray(item.json.opportunities)\n    ? item.json.opportunities\n    : [item.json]\n);\n\nconst match = opportunities.find(opportunity =>\n  opportunity.id &&\n  (opportunity.contactId ?? opportunity.contact?.id) === contact.id &&\n  opportunity.status === 'open'\n);\n\nreturn [{\n  json: {\n    ...inquiry,\n    contactId: contact.id,\n    opportunityExists: Boolean(match),\n    opportunityId: match?.id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        368
+      ],
+      "id": "c15c01c2-333c-4215-8a70-fd129799dee5",
+      "name": "Code in JavaScript2",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "31a0de58-c9b8-48ab-a7ac-88d3d4f02402",
+              "leftValue": "={{ $json.opportunityExists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        368
+      ],
+      "id": "7e206d85-28a0-46f6-88f9-a120a0ae676b",
+      "name": "Opportunity Exists?2"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "pipelineId": "REPLACE_WITH_PIPELINE_ID",
+        "contactId": "={{ $json.contactId }}",
+        "name": "={{ $json.name + ' - ' + $json.motorcycle }}",
+        "additionalFields": {
+          "monetaryValue": "={{ $json.budget }}",
+          "stageId": "REPLACE_WITH_NEW_INQUIRY_STAGE_ID"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        464
+      ],
+      "id": "2c64f709-8382-44ae-8e00-06e85bf2add2",
+      "name": "Create an opportunity2"
+    },
+    {
+      "parameters": {
+        "resource": "opportunity",
+        "operation": "update",
+        "opportunityId": "={{ $json.opportunityId }}",
+        "updateFields": {
+          "monetaryValue": "={{ $json.budget }}",
+          "stageId": "={{ 'REPLACE_WITH_NEW_INQUIRY_STAGE_ID' }}",
+          "status": "open"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        272
+      ],
+      "id": "09ca20c7-1bc7-486d-9fad-12a50693774f",
+      "name": "Update an opportunity2"
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "getAll",
+        "contactId": "={{ $('Create or update a contact').first().json.id }}",
+        "returnAll": true,
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.highLevel",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        -464
+      ],
+      "id": "24c6118b-7a58-451f-ad44-92a33ebc679f",
+      "name": "Get many tasks",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Create or update a contact').first().json;\n\nconst tasks = $input.all().flatMap(item =>\n  Array.isArray(item.json.tasks)\n    ? item.json.tasks\n    : [item.json]\n);\n\nconst existingTask = tasks.find(task =>\n  task.id &&\n  String(task.title ?? '').trim().toLowerCase() ===\n    'follow up on motorcycle inquiry' &&\n  task.completed !== true\n);\n\nreturn [{\n  json: {\n    contactId: contact.id,\n    taskExists: Boolean(existingTask),\n    taskId: existingTask?.id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        -464
+      ],
+      "id": "22f907a5-7ec5-4824-acbd-58e834e02d09",
+      "name": "Check Follow-up Task"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e9d7fd9c-ec40-401d-9c89-233010616af8",
+              "leftValue": "={{ $json.taskExists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2256,
+        -464
+      ],
+      "id": "efde4df1-dc63-4eee-bbd2-44a08ee8d4dd",
+      "name": "Follow-up Task Exists?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Validate Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Fields": {
+      "main": [
+        [
+          {
+            "node": "Create or update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or update a contact": {
+      "main": [
+        [
+          {
+            "node": "Classify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Lead": {
+      "main": [
+        [
+          {
+            "node": "Find Open Opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Open Opportunity1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Open Opportunity2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Opportunity": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Opportunity Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opportunity Exists?": {
+      "main": [
+        [
+          {
+            "node": "Update an opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create an opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an opportunity": {
+      "main": [
+        [
+          {
+            "node": "Get many tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Opportunity1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Opportunity Exists?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opportunity Exists?1": {
+      "main": [
+        [
+          {
+            "node": "Update an opportunity1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create an opportunity1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Opportunity2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Opportunity Exists?2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opportunity Exists?2": {
+      "main": [
+        [
+          {
+            "node": "Update an opportunity2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create an opportunity2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an opportunity": {
+      "main": [
+        [
+          {
+            "node": "Get many tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many tasks": {
+      "main": [
+        [
+          {
+            "node": "Check Follow-up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Follow-up Task": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Task Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up Task Exists?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Create a task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}
