@@ -29,6 +29,8 @@ Hot leads continue through Get many tasks → Check Follow-up Task → Follow-up
 
 Warm and Cold branches end after opportunity creation or update. Task creation is implemented for Hot leads only.
 
+![n8n motorcycle inquiry workflow](workflow4.png)
+
 ## Files
 
 - `motorcycle-inquiry-workflow.json`: sanitized n8n workflow template.
